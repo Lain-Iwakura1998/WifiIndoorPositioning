@@ -19,13 +19,13 @@ import com.talentica.wifiindoorpositioning.wifiindoorpositioning.adapter.Project
 import com.talentica.wifiindoorpositioning.wifiindoorpositioning.model.IndoorProject;
 import com.talentica.wifiindoorpositioning.wifiindoorpositioning.utils.RecyclerItemClickListener;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class HomeActivity extends AppCompatActivity
         implements View.OnClickListener, RecyclerItemClickListener.OnItemClickListener {
 
-    private List<IndoorProject> projects = new ArrayList<>();
+    // 直接引用 NewProjectActivity 的静态列表
+    private List<IndoorProject> projects = NewProjectActivity.projectList;
     private RecyclerView mRecyclerView;
     private ProjectsListAdapter mAdapter;
     private RecyclerView.LayoutManager mLayoutManager;
@@ -35,10 +35,6 @@ public class HomeActivity extends AppCompatActivity
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         initUI();
-
-        // NOTE: Realm removed. If you need demo items, uncomment below to add mock data.
-        // projects.add(new IndoorProject(1, "Demo Project A"));
-        // projects.add(new IndoorProject(2, "Demo Project B"));
 
         if (projects.isEmpty()) {
             Snackbar.make(fab, "Empty List, Try creating project", Snackbar.LENGTH_LONG)
@@ -52,7 +48,7 @@ public class HomeActivity extends AppCompatActivity
     @Override
     protected void onResume() {
         super.onResume();
-        // If you populate 'projects' elsewhere at runtime, refresh the list here.
+        // 每次返回界面时刷新列表
         mAdapter.notifyDataSetChanged();
     }
 
@@ -65,11 +61,10 @@ public class HomeActivity extends AppCompatActivity
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()){
-            case R.id.settings:
-                Intent intent = new Intent(this, UnifiedNavigationActivity.class);
-                startActivity(intent);
-                return true;
+        if (item.getItemId() == R.id.settings) {
+            Intent intent = new Intent(this, UnifiedNavigationActivity.class);
+            startActivity(intent);
+            return true;
         }
         return super.onOptionsItemSelected(item);
     }
@@ -102,12 +97,6 @@ public class HomeActivity extends AppCompatActivity
     }
 
     @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        // Realm removed: no need to close anything here.
-    }
-
-    @Override
     public void onItemClick(View view, int position) {
         if (position >= 0 && position < projects.size()) {
             Intent intent = new Intent(this, ProjectDetailActivity.class);
@@ -119,7 +108,6 @@ public class HomeActivity extends AppCompatActivity
 
     @Override
     public void onLongClick(View view, int position) {
-        // No-op for now
+        // 暂不处理长按
     }
 }
-```
