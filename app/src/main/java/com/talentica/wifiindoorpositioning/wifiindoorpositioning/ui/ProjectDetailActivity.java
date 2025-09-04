@@ -90,9 +90,11 @@ public class ProjectDetailActivity extends AppCompatActivity implements View.OnC
         btnLocateMe.setOnClickListener(this);
         setCounts();
 
-        SectionParameters sp = new SectionParameters.Builder(R.layout.item_point_details)
-                .headerResourceId(R.layout.item_section_details)
-                .build();
+        SectionParameters sp = SectionParameters.builder()
+        .itemResourceId(R.layout.item_point_details)
+        .headerResourceId(R.layout.item_section_details)
+        .build();
+        
         apSec = new AccessPointSection(sp);
         rpSec = new ReferencePointSection(sp);
         apSec.setAccessPoints(project.getAps());
