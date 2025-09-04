@@ -31,16 +31,10 @@ import com.talentica.wifiindoorpositioning.wifiindoorpositioning.utils.Utils;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-
-import io.realm.Realm;
-import io.realm.RealmList;
-
-/**
- * Created by suyashg on 07/09/17.
- */
 
 public class AddOrEditReferencePointActivity extends AppCompatActivity implements View.OnClickListener {
 
@@ -76,7 +70,8 @@ public class AddOrEditReferencePointActivity extends AppCompatActivity implement
         projectId = getIntent().getStringExtra("projectId");
         if (projectId == null) {
             Toast.makeText(this, "Reference point not found", Toast.LENGTH_LONG).show();
-            this.finish();
+            finish();
+            return;
         }
 
         if (getIntent().getStringExtra("rpId") != null) {
@@ -84,15 +79,25 @@ public class AddOrEditReferencePointActivity extends AppCompatActivity implement
             rpId = getIntent().getStringExtra("rpId");
         }
         initUI();
-        Realm realm = Realm.getDefaultInstance();
+
         if (isEdit) {
-            referencePointFromDB = realm.where(ReferencePoint.class).equalTo("id", rpId).findFirst();
+            // 从内存中查找 ReferencePoint
+            for (IndoorProject p : NewProjectActivity.projectList) {
+                if (p.getId().equals(projectId)) {
+                    for (ReferencePoint rp : p.getRps()) {
+                        if (rp.getId().equals(rpId)) {
+                            referencePointFromDB = rp;
+                            break;
+                        }
+                    }
+                }
+            }
             if (referencePointFromDB == null) {
                 Toast.makeText(this, "Reference point not found", Toast.LENGTH_LONG).show();
-                this.finish();
+                finish();
+                return;
             }
-            RealmList<AccessPoint> readings = referencePointFromDB.getReadings();
-            for (AccessPoint ap:readings) {
+            for (AccessPoint ap : referencePointFromDB.getReadings()) {
                 readingsAdapter.addAP(ap);
             }
             readingsAdapter.notifyDataSetChanged();
@@ -104,16 +109,23 @@ public class AddOrEditReferencePointActivity extends AppCompatActivity implement
             receiverWifi = new AvailableAPsReceiver();
             wifiWasEnabled = mainWifi.isWifiEnabled();
 
-            IndoorProject project = realm.where(IndoorProject.class).equalTo("id", projectId).findFirst();
-            RealmList<AccessPoint> points = project.getAps();
-            for (AccessPoint accessPoint : points) {
-                aps.put(accessPoint.getMac_address(), accessPoint);
+            IndoorProject project = null;
+            for (IndoorProject p : NewProjectActivity.projectList) {
+                if (p.getId().equals(projectId)) {
+                    project = p;
+                    break;
+                }
+            }
+            if (project != null) {
+                for (AccessPoint accessPoint : project.getAps()) {
+                    aps.put(accessPoint.getMac_address(), accessPoint);
+                }
             }
             if (aps.isEmpty()) {
                 Toast.makeText(this, "No Access Points Found", Toast.LENGTH_SHORT).show();
             }
             if (!Utils.isLocationEnabled(this)) {
-                Toast.makeText(this,"Please turn on the location", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Please turn on the location", Toast.LENGTH_SHORT).show();
             }
         }
     }
@@ -157,12 +169,9 @@ public class AddOrEditReferencePointActivity extends AppCompatActivity implement
     private void caliberationCompleted() {
         isCaliberating = false;
         Log.v(TAG, "caliberationCompleted");
-        Map<String, List<Integer>> values = readings;
-        Log.v(TAG, "values:"+values.toString());
-        for (Map.Entry<String, List<Integer>> entry : values.entrySet()) {
+        for (Map.Entry<String, List<Integer>> entry : readings.entrySet()) {
             List<Integer> readingsOfAMac = entry.getValue();
             Double mean = calculateMeanValue(readingsOfAMac);
-            Log.v(TAG, "entry.Key:"+entry.getKey()+" aps:"+aps);
             AccessPoint accessPoint = aps.get(entry.getKey());
             AccessPoint updatedPoint = new AccessPoint(accessPoint);
             updatedPoint.setMeanRss(mean);
@@ -178,12 +187,11 @@ public class AddOrEditReferencePointActivity extends AppCompatActivity implement
         if (readings.isEmpty()) {
             return 0.0d;
         }
-        Integer sum = 0;
+        int sum = 0;
         for (Integer integer : readings) {
-            sum = sum + integer;
+            sum += integer;
         }
-        double mean = Double.valueOf(sum) / Double.valueOf(readings.size());
-        return mean;
+        return (double) sum / readings.size();
     }
 
     private void initUI() {
@@ -212,112 +220,36 @@ public class AddOrEditReferencePointActivity extends AppCompatActivity implement
     @Override
     public void onClick(View view) {
         if (view.getId() == bnRpSave.getId() && !isEdit) {
-            Realm realm = Realm.getDefaultInstance();
-            realm.beginTransaction();
             ReferencePoint referencePoint = new ReferencePoint();
             referencePoint = setValues(referencePoint);
             referencePoint.setCreatedAt(Calendar.getInstance().getTime());
             referencePoint.setDescription("");
-//            apsWithReading = realm.copyToRealmOrUpdate(apsWithReading);
-            if (referencePoint.getReadings() == null) {
-                RealmList<AccessPoint> readings = new RealmList<>();
-                readings.addAll(apsWithReading);
-                referencePoint.setReadings(readings);
-            } else {
-                referencePoint.getReadings().addAll(apsWithReading);
-            }
-
+            referencePoint.setReadings(new ArrayList<>(apsWithReading));
             referencePoint.setId(UUID.randomUUID().toString());
 
-            IndoorProject project = realm.where(IndoorProject.class).equalTo("id", projectId).findFirst();
-            if (project.getRps() == null) {
-                RealmList<ReferencePoint> points = new RealmList<>();
-                points.add(referencePoint);
-                project.setRps(points);
-            } else {
-                project.getRps().add(referencePoint);
+            for (IndoorProject p : NewProjectActivity.projectList) {
+                if (p.getId().equals(projectId)) {
+                    p.getRps().add(referencePoint);
+                    break;
+                }
             }
-
-            realm.commitTransaction();
-            Toast.makeText(this,"Reference Point Added", Toast.LENGTH_SHORT).show();
-            this.finish();
+            Toast.makeText(this, "Reference Point Added", Toast.LENGTH_SHORT).show();
+            finish();
         } else if (view.getId() == bnRpSave.getId() && isEdit) {
-            Realm realm = Realm.getDefaultInstance();
-            realm.beginTransaction();
             referencePointFromDB = setValues(referencePointFromDB);
-            realm.commitTransaction();
-            Toast.makeText(this,"Reference Point Updated", Toast.LENGTH_SHORT).show();
-            this.finish();
+            Toast.makeText(this, "Reference Point Updated", Toast.LENGTH_SHORT).show();
+            finish();
         }
     }
 
     private ReferencePoint setValues(ReferencePoint referencePoint) {
         String x = etRpX.getText().toString();
         String y = etRpY.getText().toString();
-        if (TextUtils.isEmpty(x)) {
-            referencePoint.setX(0.0d);
-        } else {
-            referencePoint.setX(Double.valueOf(x));
-        }
-
-        if (TextUtils.isEmpty(y)) {
-            referencePoint.setY(0.0d);
-        } else {
-            referencePoint.setY(Double.valueOf(y));
-        }
-        referencePoint.setLocId(referencePoint.getX() + " " + referencePoint.getY());
         referencePoint.setName(etRpName.getText().toString());
-        return referencePoint;
-    }
-
-    class AvailableAPsReceiver extends BroadcastReceiver {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            List<ScanResult> scanResults = mainWifi.getScanResults();
-            ++readingsCount;
-            for (Map.Entry<String, AccessPoint> entry : aps.entrySet()) {
-                String apMac = entry.getKey();
-                for (ScanResult scanResult : scanResults) {
-                    if (entry.getKey().equals(scanResult.BSSID)) {
-                        checkAndAddApRSS(apMac, scanResult.level);
-                        apMac = null;//do this after always :|
-                        break;
-                    }
-                }
-                if (apMac != null) {
-                    checkAndAddApRSS(apMac, AppContants.NaN.intValue());
-                }
-            }
-//            results.put(Calendar.getInstance(), map);
-
-            Log.v(TAG, "Count:" + readingsCount+" scanResult:"+ scanResults.toString()+" aps:"+aps.toString());
-            for (int i = 0; i < readingsCount; ++i) {
-//                Log.v(TAG, "  BSSID       =" + results.get(i).BSSID);
-//                Log.v(TAG, "  SSID        =" + results.get(i).SSID);
-//                Log.v(TAG, "  Capabilities=" + results.get(i).capabilities);
-//                Log.v(TAG, "  Frequency   =" + results.get(i).frequency);
-//                Log.v(TAG, "  Level       =" + results.get(i).level);
-//                Log.v(TAG, "---------------");
-            }
+        if (!TextUtils.isEmpty(x)) {
+            referencePoint.setX(Double.parseDouble(x));
         }
-    }
-
-    private void checkAndAddApRSS(String apMac, Integer level) {
-        if (readings.containsKey(apMac)) {
-            List<Integer> integers = readings.get(apMac);
-            integers.add(level);
-        } else {
-            List<Integer> integers = new ArrayList<>();
-            integers.add(level);
-            readings.put(apMac, integers);
+        if (!TextUtils.isEmpty(y)) {
+            referencePoint.setY(Double.parseDouble(y));
         }
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        if (!wifiWasEnabled && !isEdit) {
-            mainWifi.setWifiEnabled(false);
-        }
-    }
-}
+        referencePoint.setLocId(referencePoint.getX
