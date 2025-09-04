@@ -27,13 +27,10 @@ import com.talentica.wifiindoorpositioning.wifiindoorpositioning.model.IndoorPro
 import com.talentica.wifiindoorpositioning.wifiindoorpositioning.model.ReferencePoint;
 import com.talentica.wifiindoorpositioning.wifiindoorpositioning.utils.RecyclerItemClickListener;
 
+import java.util.Iterator;
+
 import io.github.luizgrp.sectionedrecyclerviewadapter.SectionParameters;
 import io.github.luizgrp.sectionedrecyclerviewadapter.SectionedRecyclerViewAdapter;
-import io.realm.Realm;
-
-/**
- * Created by suyashg on 25/08/17.
- */
 
 public class ProjectDetailActivity extends AppCompatActivity implements View.OnClickListener, RecyclerItemClickListener.OnItemClickListener {
 
@@ -57,13 +54,25 @@ public class ProjectDetailActivity extends AppCompatActivity implements View.OnC
         if (projectId == null) {
             Toast.makeText(getApplicationContext(), "Project Not Found", Toast.LENGTH_LONG).show();
             this.finish();
+            return;
         }
-        Log.i("ProjectDetailActivity", "id>"+projectId);
+        Log.i("ProjectDetailActivity", "id>" + projectId);
 
-        Realm realm = Realm.getDefaultInstance();
+        // 从静态列表中查找项目
+        for (IndoorProject p : NewProjectActivity.projectList) {
+            if (p.getId().equals(projectId)) {
+                project = p;
+                break;
+            }
+        }
 
-        project = realm.where(IndoorProject.class).equalTo("id", projectId).findFirst();
-        Log.i("ProjectDetailActivity", "name>"+project.getName());
+        if (project == null) {
+            Toast.makeText(getApplicationContext(), "Project Not Found", Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
+
+        Log.i("ProjectDetailActivity", "name>" + project.getName());
 
         initUI();
     }
@@ -93,7 +102,7 @@ public class ProjectDetailActivity extends AppCompatActivity implements View.OnC
         pointRV.addItemDecoration(new DividerItemDecoration(this, DividerItemDecoration.VERTICAL));
         pointRV.setLayoutManager(layoutManager);
         pointRV.setAdapter(sectionAdapter);
-        pointRV.addOnItemTouchListener(new RecyclerItemClickListener(this,pointRV, this));
+        pointRV.addOnItemTouchListener(new RecyclerItemClickListener(this, pointRV, this));
     }
 
     private void setCounts() {
@@ -105,10 +114,10 @@ public class ProjectDetailActivity extends AppCompatActivity implements View.OnC
             getSupportActionBar().setTitle(name);
         }
         if (apCount > 0) {
-            ((TextView)findViewById(R.id.tv_ap_count)).setText("Access Points:"+String.valueOf(apCount));
+            ((TextView) findViewById(R.id.tv_ap_count)).setText("Access Points:" + apCount);
         }
         if (rpCount > 0) {
-            ((TextView)findViewById(R.id.tv_rp_count)).setText("Reference Points:"+String.valueOf(rpCount));
+            ((TextView) findViewById(R.id.tv_rp_count)).setText("Reference Points:" + rpCount);
         }
     }
 
@@ -124,19 +133,19 @@ public class ProjectDetailActivity extends AppCompatActivity implements View.OnC
         if (view.getId() == btnAddAp.getId()) {
             startAddAPActivity("");
         } else if (view.getId() == btnAddRp.getId()) {
-            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED){
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+                    ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
                         PERM_REQ_CODE_RP_ACCESS_COARSE_LOCATION);
-                //After this point you wait for callback in onRequestPermissionsResult(int, String[], int[]) overriden method
-            } else{
+            } else {
                 startAddRPActivity(null);
             }
         } else if (view.getId() == btnLocateMe.getId()) {
-            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED){
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+                    ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
                         PERM_REQ_CODE_LM_ACCESS_COARSE_LOCATION);
-                //After this point you wait for callback in onRequestPermissionsResult(int, String[], int[]) overriden method
-            } else{
+            } else {
                 startAddLocateMeActivity();
             }
         }
@@ -146,7 +155,7 @@ public class ProjectDetailActivity extends AppCompatActivity implements View.OnC
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         if (requestCode == PERM_REQ_CODE_RP_ACCESS_COARSE_LOCATION && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             startAddRPActivity(null);
-        } else if(requestCode == PERM_REQ_CODE_LM_ACCESS_COARSE_LOCATION && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+        } else if (requestCode == PERM_REQ_CODE_LM_ACCESS_COARSE_LOCATION && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             startAddLocateMeActivity();
         }
     }
@@ -173,80 +182,18 @@ public class ProjectDetailActivity extends AppCompatActivity implements View.OnC
 
     @Override
     public void onItemClick(View view, int position) {
-//        Toast.makeText(this,"onItemClick pos>"+position, Toast.LENGTH_SHORT).show();
-        int apsCount = 0;
-        if (project.getAps() != null) {
-            apsCount = project.getAps().size();
-        }
-        if (position <= apsCount && position != 0) {//AP section event
+        int apsCount = project.getAps() != null ? project.getAps().size() : 0;
+        if (position <= apsCount && position != 0) {
             AccessPoint accessPoint = project.getAps().get(position - 1);
             startAddAPActivity(accessPoint.getId());
-        } else if (position > (apsCount+1)) {//RP section event
-            ReferencePoint referencePoint = project.getRps().get(position - apsCount - 1 - 1);
+        } else if (position > (apsCount + 1)) {
+            ReferencePoint referencePoint = project.getRps().get(position - apsCount - 2);
             startAddRPActivity(referencePoint.getId());
         }
     }
 
     @Override
     public void onLongClick(View view, int position) {
-//        Toast.makeText(this,"onLongClick pos>"+position, Toast.LENGTH_SHORT).show();
-        int apsCount = 0;
-        if (project.getAps() != null) {
-            apsCount = project.getAps().size();
-        }
-        if (position <= apsCount && position != 0) {//AP section event
-            AccessPoint accessPoint = project.getAps().get(position - 1);
-            showDeleteDialog(accessPoint, null);
-        } else if (position > (apsCount+1)) {//RP section event
-            ReferencePoint referencePoint = project.getRps().get(position - apsCount - 1 - 1);
-            showDeleteDialog(null, referencePoint);
-        }
-    }
-
-    private void showDeleteDialog(final AccessPoint accessPoint,final ReferencePoint referencePoint) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this, R.style.Theme_AppCompat_DayNight_Dialog);
-        if (accessPoint != null) {
-            builder.setTitle("Delete this Access Point");
-            builder.setMessage("Delete "+ accessPoint.getSsid());
-        } else {
-            builder.setTitle("Delete this Reference Point");
-            builder.setMessage("Delete "+ referencePoint.getName());
-        }
-
-        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialogInterface, int i) {
-                Realm realm = Realm.getDefaultInstance();
-                if (accessPoint != null) {
-                    realm.executeTransaction(new Realm.Transaction() {
-                        @Override
-                        public void execute(Realm realm) {
-                            accessPoint.deleteFromRealm();
-                            refreshList();
-                        }
-                    });
-                } else {
-                    realm.executeTransaction(new Realm.Transaction() {
-                        @Override
-                        public void execute(Realm realm) {
-                            referencePoint.deleteFromRealm();
-//                            project.getRps().deleteAllFromRealm();
-                            refreshList();
-                        }
-                    });
-                }
-            }
-        });
-        builder.setNegativeButton("Cancel", null);
-        builder.show();
-    }
-
-    private void refreshList() {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                sectionAdapter.notifyDataSetChanged();
-            }
-        });
-    }
-}
+        int apsCount = project.getAps() != null ? project.getAps().size() : 0;
+        if (position <= apsCount && position != 0) {
+            AccessPoint accessPoint = project.getAps().get(position - 1
