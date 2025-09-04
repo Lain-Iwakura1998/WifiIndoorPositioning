@@ -26,12 +26,6 @@ import com.talentica.wifiindoorpositioning.wifiindoorpositioning.model.WifiData;
 import com.talentica.wifiindoorpositioning.wifiindoorpositioning.utils.AppContants;
 import com.talentica.wifiindoorpositioning.wifiindoorpositioning.utils.Utils;
 
-import io.realm.Realm;
-
-/**
- * Created by suyashg on 10/09/17.
- */
-
 public class LocateMeActivity extends AppCompatActivity {
 
     private WifiData mWifiData;
@@ -69,10 +63,24 @@ public class LocateMeActivity extends AppCompatActivity {
         projectId = getIntent().getStringExtra("projectId");
         if (projectId == null) {
             Toast.makeText(getApplicationContext(), "Project Not Found", Toast.LENGTH_LONG).show();
-            this.finish();
+            finish();
+            return;
         }
-        Realm realm = Realm.getDefaultInstance();
-        project = realm.where(IndoorProject.class).equalTo("id", projectId).findFirst();
+
+        // 从静态列表中查找项目
+        for (IndoorProject p : NewProjectActivity.projectList) {
+            if (p.getId().equals(projectId)) {
+                project = p;
+                break;
+            }
+        }
+
+        if (project == null) {
+            Toast.makeText(getApplicationContext(), "Project Not Found", Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
+
         Log.v("LocateMeActivity", "onCreate");
     }
 
@@ -99,7 +107,8 @@ public class LocateMeActivity extends AppCompatActivity {
             mWifiData = (WifiData) intent.getParcelableExtra(AppContants.WIFI_DATA);
 
             if (mWifiData != null) {
-                LocationWithNearbyPlaces loc = Algorithms.processingAlgorithms(mWifiData.getNetworks(), project, Integer.parseInt(defaultAlgo));
+                LocationWithNearbyPlaces loc = Algorithms.processingAlgorithms(
+                        mWifiData.getNetworks(), project, Integer.parseInt(defaultAlgo));
                 Log.v("LocateMeActivity", "loc:" + loc);
                 if (loc == null) {
                     tvLocation.setText("Location: NA\nNote:Please switch on your wifi and location services with permission provided to App");
