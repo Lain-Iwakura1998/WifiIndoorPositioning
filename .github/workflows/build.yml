@@ -18,8 +18,8 @@ jobs:
         java-version: '8'
         distribution: 'temurin'
 
-    - name: Build with Gradle (debug mode)
-     run: ./gradlew assembleDebug --stacktrace --debug
+   - name: Build with Gradle
+  run: ./gradlew assembleDebug
 
 
     - name: Upload APK
