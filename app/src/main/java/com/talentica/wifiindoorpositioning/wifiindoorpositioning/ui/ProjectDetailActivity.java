@@ -28,6 +28,7 @@ import com.talentica.wifiindoorpositioning.wifiindoorpositioning.model.Reference
 import com.talentica.wifiindoorpositioning.wifiindoorpositioning.utils.RecyclerItemClickListener;
 
 import java.util.Iterator;
+import java.util.List;
 
 import io.github.luizgrp.sectionedrecyclerviewadapter.SectionParameters;
 import io.github.luizgrp.sectionedrecyclerviewadapter.SectionedRecyclerViewAdapter;
@@ -53,7 +54,7 @@ public class ProjectDetailActivity extends AppCompatActivity implements View.OnC
         projectId = getIntent().getStringExtra("id");
         if (projectId == null) {
             Toast.makeText(getApplicationContext(), "Project Not Found", Toast.LENGTH_LONG).show();
-            this.finish();
+            finish();
             return;
         }
         Log.i("ProjectDetailActivity", "id>" + projectId);
@@ -196,4 +197,76 @@ public class ProjectDetailActivity extends AppCompatActivity implements View.OnC
     public void onLongClick(View view, int position) {
         int apsCount = project.getAps() != null ? project.getAps().size() : 0;
         if (position <= apsCount && position != 0) {
-            AccessPoint accessPoint = project.getAps().get(position - 1
+            AccessPoint accessPoint = project.getAps().get(position - 1);
+            showDeleteDialog(accessPoint, null);
+        } else if (position > (apsCount + 1)) {
+            ReferencePoint referencePoint = project.getRps().get(position - apsCount - 2);
+            showDeleteDialog(null, referencePoint);
+        }
+    }
+
+    private void showDeleteDialog(final AccessPoint accessPoint, final ReferencePoint referencePoint) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this, R.style.Theme_AppCompat_DayNight_Dialog);
+        if (accessPoint != null) {
+            builder.setTitle("Delete this Access Point");
+            builder.setMessage("Delete " + accessPoint.getSsid());
+        } else {
+            builder.setTitle("Delete this Reference Point");
+            builder.setMessage("Delete " + referencePoint.getName());
+        }
+
+        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int i) {
+                if (accessPoint != null) {
+                    removeApById(accessPoint.getId());
+                } else if (referencePoint != null) {
+                    removeRpById(referencePoint.getId());
+                }
+                refreshList();
+                setCounts();
+            }
+        });
+        builder.setNegativeButton("Cancel", null);
+        builder.show();
+    }
+
+    private void removeApById(String apId) {
+        List<AccessPoint> list = project.getAps();
+        if (list == null) return;
+        Iterator<AccessPoint> it = list.iterator();
+        while (it.hasNext()) {
+            AccessPoint ap = it.next();
+            if (apId.equals(ap.getId())) {
+                it.remove();
+                break;
+            }
+        }
+        // 更新 section 的数据源
+        apSec.setAccessPoints(project.getAps());
+    }
+
+    private void removeRpById(String rpId) {
+        List<ReferencePoint> list = project.getRps();
+        if (list == null) return;
+        Iterator<ReferencePoint> it = list.iterator();
+        while (it.hasNext()) {
+            ReferencePoint rp = it.next();
+            if (rpId.equals(rp.getId())) {
+                it.remove();
+                break;
+            }
+        }
+        // 更新 section 的数据源
+        rpSec.setReferencePoints(project.getRps());
+    }
+
+    private void refreshList() {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                sectionAdapter.notifyDataSetChanged();
+            }
+        });
+    }
+}
