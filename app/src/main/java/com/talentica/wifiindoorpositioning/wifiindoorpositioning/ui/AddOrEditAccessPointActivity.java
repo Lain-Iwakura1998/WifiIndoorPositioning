@@ -5,7 +5,6 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.design.widget.Snackbar;
 import android.support.v4.content.ContextCompat;
@@ -22,12 +21,6 @@ import com.talentica.wifiindoorpositioning.wifiindoorpositioning.model.IndoorPro
 import java.util.Date;
 import java.util.UUID;
 
-import io.realm.Realm;
-
-/**
- * Created by suyashg on 26/08/17.
- */
-
 public class AddOrEditAccessPointActivity extends AppCompatActivity implements View.OnClickListener {
 
     private Button addAp, btnScanAP;
@@ -36,7 +29,7 @@ public class AddOrEditAccessPointActivity extends AppCompatActivity implements V
     private boolean isEdit = false;
     private AccessPoint apToBeEdited;
     private int PERMISSIONS_REQUEST_CODE_ACCESS_COARSE_LOCATION = 199;
-    private static final int REQ_CODE = 1212;//this is always positive
+    private static final int REQ_CODE = 1212;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -44,28 +37,45 @@ public class AddOrEditAccessPointActivity extends AppCompatActivity implements V
         setContentView(R.layout.activity_add_access_point);
 
         projectId = getIntent().getStringExtra("projectId");
-        if(projectId == null) {
+        if (projectId == null) {
             Toast.makeText(this, "Access point not found", Toast.LENGTH_LONG).show();
-            this.finish();
+            finish();
+            return;
         }
 
         apID = getIntent().getStringExtra("apID");
         initUI();
-        if (apID.equals("")) {
+        if (apID == null || apID.isEmpty()) {
             isEdit = false;
         } else {
             isEdit = true;
             addAp.setText("Save");
+            setUpEditMode();
         }
-
-        if (isEdit)
-        setUpEditMode();
     }
 
     private void setUpEditMode() {
-        Realm realm = Realm.getDefaultInstance();
-        apToBeEdited = realm.where(AccessPoint.class).equalTo("id", apID).findFirst();
-        setValuesToFields(apToBeEdited);
+        IndoorProject project = findProjectById(projectId);
+        if (project != null) {
+            for (AccessPoint ap : project.getAps()) {
+                if (ap.getId().equals(apID)) {
+                    apToBeEdited = ap;
+                    break;
+                }
+            }
+        }
+        if (apToBeEdited != null) {
+            setValuesToFields(apToBeEdited);
+        }
+    }
+
+    private IndoorProject findProjectById(String id) {
+        for (IndoorProject p : NewProjectActivity.projectList) {
+            if (p.getId().equals(id)) {
+                return p;
+            }
+        }
+        return null;
     }
 
     private void setValuesToFields(AccessPoint accessPoint) {
@@ -96,45 +106,58 @@ public class AddOrEditAccessPointActivity extends AppCompatActivity implements V
             final String x = etX.getText().toString().trim();
             final String y = etY.getText().toString().trim();
             final String mac = etMAC.getText().toString().trim();
-            final boolean isEditMode = isEdit;
 
             if (text.isEmpty()) {
                 Snackbar.make(addAp, "Provide Access Point Name", Snackbar.LENGTH_LONG)
                         .setAction("Action", null).show();
-            } else {
-                // Obtain a Realm instance
-                Realm realm = Realm.getDefaultInstance();
-                realm.beginTransaction();
-                IndoorProject project = realm.where(IndoorProject.class).equalTo("id", projectId).findFirst();
-                if (isEditMode) {
+                return;
+            }
+
+            IndoorProject project = findProjectById(projectId);
+            if (project == null) {
+                Toast.makeText(this, "Project not found", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            if (isEdit) {
+                if (apToBeEdited != null) {
                     apToBeEdited.setSsid(text);
                     apToBeEdited.setDescription(desc);
-                    apToBeEdited.setX(Double.valueOf(x));
-                    apToBeEdited.setY(Double.valueOf(y));
+                    apToBeEdited.setX(parseDoubleOrZero(x));
+                    apToBeEdited.setY(parseDoubleOrZero(y));
                     apToBeEdited.setMac_address(mac);
-                } else {
-                    AccessPoint accessPoint = realm.createObject(AccessPoint.class, UUID.randomUUID().toString());
-                    accessPoint.setBssid(mac);
-                    accessPoint.setDescription(desc);
-                    accessPoint.setCreatedAt(new Date());
-                    accessPoint.setX(Double.valueOf(x));
-                    accessPoint.setY(Double.valueOf(y));
-                    accessPoint.setSsid(text);
-                    accessPoint.setMac_address(mac);
-                    project.getAps().add(accessPoint);
                 }
-                realm.commitTransaction();
-                this.finish();
+            } else {
+                AccessPoint accessPoint = new AccessPoint();
+                accessPoint.setId(UUID.randomUUID().toString());
+                accessPoint.setBssid(mac);
+                accessPoint.setDescription(desc);
+                accessPoint.setCreatedAt(new Date());
+                accessPoint.setX(parseDoubleOrZero(x));
+                accessPoint.setY(parseDoubleOrZero(y));
+                accessPoint.setSsid(text);
+                accessPoint.setMac_address(mac);
+                project.getAps().add(accessPoint);
             }
+            finish();
+
         } else if (view.getId() == btnScanAP.getId()) {
-            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED){
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+                    ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+                            != PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
                         PERMISSIONS_REQUEST_CODE_ACCESS_COARSE_LOCATION);
-                //After this point you wait for callback in onRequestPermissionsResult(int, String[], int[]) overriden method
-
-            } else{
+            } else {
                 startSearchWifiActivity();
             }
+        }
+    }
+
+    private double parseDoubleOrZero(String val) {
+        try {
+            return Double.parseDouble(val);
+        } catch (NumberFormatException e) {
+            return 0.0d;
         }
     }
 
@@ -145,7 +168,8 @@ public class AddOrEditAccessPointActivity extends AppCompatActivity implements V
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        if (requestCode == PERMISSIONS_REQUEST_CODE_ACCESS_COARSE_LOCATION && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+        if (requestCode == PERMISSIONS_REQUEST_CODE_ACCESS_COARSE_LOCATION &&
+                grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             startSearchWifiActivity();
         }
     }
@@ -153,9 +177,11 @@ public class AddOrEditAccessPointActivity extends AppCompatActivity implements V
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQ_CODE && resultCode == RESULT_OK) {
+        if (requestCode == REQ_CODE && resultCode == RESULT_OK && data != null) {
             AccessPoint accessPoint = (AccessPoint) data.getParcelableExtra("accessPoint");
-            setValuesToFields(accessPoint);
+            if (accessPoint != null) {
+                setValuesToFields(accessPoint);
+            }
         }
     }
 }
